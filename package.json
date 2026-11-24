@@ -1,0 +1,18 @@
+{
+  "name": "horizons-final-dance",
+  "version": "1.0.0",
+  "description": "视界终舞 · Final Dance of the Horizons — 双黑洞旋近、并合与铃宕的广义相对论光线追踪模拟",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

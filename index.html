@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>视界终舞 · Final Dance of the Horizons</title>
+<meta name="description" content="双黑洞旋近、并合与铃宕的广义相对论光线追踪模拟">
+<style>
+  :root {
+    --ink: #e9e6df; --dim: #9a968c; --amber: #ffb15c; --cyan: #6fe3ff;
+    --bg: rgba(9, 11, 17, .66); --line: rgba(255, 255, 255, .09);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: #000; color: var(--ink);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif; }
+  #stage, #stage canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #fade { position: fixed; inset: 0; z-index: 3; background: #000; opacity: 1; pointer-events: none; }
+
+  .ui { position: fixed; z-index: 5; transition: opacity .35s ease; }
+  body.bare .ui { opacity: 0; pointer-events: none; }
+  body.clean .ui { display: none !important; }
+  body.bare #bareHint { opacity: 1; }
+  .panel { background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+
+  #masthead { left: 32px; top: 28px; text-shadow: 0 2px 18px rgba(0, 0, 0, .85); }
+  #masthead h1 { margin: 0; font: 600 34px/1.1 "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", serif; letter-spacing: .18em; }
+  #masthead p { margin: 6px 0 0; font-size: 11px; letter-spacing: .32em; color: var(--dim); }
+  #masthead .sub { letter-spacing: .08em; font-size: 12px; margin-top: 8px; }
+
+  #data { right: 24px; top: 24px; width: 304px; padding: 16px 18px; max-height: calc(100vh - 130px); overflow: auto; }
+  dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; }
+  dt { color: var(--dim); white-space: nowrap; }
+  dd { margin: 0; text-align: right; font: 13px ui-monospace, "SF Mono", Menlo, Consolas, monospace; white-space: nowrap; }
+  dd small { display: block; }
+  dd small { color: var(--dim); font-size: 11px; }
+  sup { font-size: .7em; }
+  .unit { color: var(--cyan); }
+  .tag { display: inline-block; margin-bottom: 10px; padding: 3px 11px; border-radius: 999px; border: 1px solid var(--line);
+    font-size: 12px; letter-spacing: .2em; color: var(--cyan); }
+  .tag[data-stage="fall"] { color: #ffd08a; }
+  .tag[data-stage="trig"] { color: var(--amber); border-color: var(--amber); }
+  .tag[data-stage="ring"] { color: var(--amber); }
+
+  .settings { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .settings summary { cursor: pointer; color: var(--dim); font-size: 12px; letter-spacing: .1em; outline: none; }
+  .settings label { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; margin: 12px 0 0; font-size: 12px; color: var(--dim); align-items: center; }
+  .settings input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--amber); }
+  .settings select { background: rgba(255, 255, 255, .06); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; }
+  .settings output { font: 12px ui-monospace, Menlo, monospace; color: var(--ink); }
+  .static { margin-top: 10px; gap: 4px 14px; }
+  .static dd { text-align: left; }
+
+  #wavePanel { left: 32px; bottom: 108px; width: min(380px, 40vw); padding: 12px 14px 8px; }
+  #wave { display: block; width: 100%; height: 80px; }
+  .caption { font-size: 11px; color: var(--dim); letter-spacing: .12em; margin-top: 4px; }
+
+  #dock { left: 50%; bottom: 28px; transform: translateX(-50%); display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; }
+  .icon { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, .05);
+    color: var(--ink); font-size: 14px; cursor: pointer; display: grid; place-items: center; padding: 0; }
+  .icon:hover { background: rgba(255, 255, 255, .13); }
+  .icon:focus-visible, .settings summary:focus-visible { outline: 2px solid var(--amber); }
+  .timeline { width: min(44vw, 520px); }
+  #vTimeline { position: relative; height: 8px; margin-top: 14px; border-radius: 999px; background: rgba(255, 255, 255, .10); cursor: pointer; touch-action: none; }
+  #vFill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--cyan), var(--amber)); }
+  #vTimeline i { position: absolute; top: -4px; width: 1px; height: 16px; background: rgba(255, 255, 255, .4); }
+  .ticks { position: relative; height: 18px; margin-top: 5px; font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+  .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }   /* 首尾两个标签分别靠左、靠右，其余居中于各自的时刻 */
+  .ticks span:first-child { transform: none; }
+  .ticks span:last-child { left: auto; right: 0; transform: none; }
+
+  #hint { left: 50%; top: 24px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: var(--bg);
+    font-size: 12px; color: var(--dim); letter-spacing: .1em; white-space: nowrap; animation: hintfade 10s ease forwards; }
+  @keyframes hintfade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+  #bareHint { top: auto; bottom: 16px; padding: 4px 12px; font-size: 11px; opacity: 0; }
+
+  #about { max-width: 760px; width: calc(100vw - 40px); padding: 26px 32px 22px; color: var(--ink); }
+  #about::backdrop { background: rgba(0, 0, 0, .68); backdrop-filter: blur(4px); }
+  #about h2 { margin: 0 0 6px; font: 600 22px "Songti SC", "STSong", "Noto Serif SC", serif; letter-spacing: .12em; }
+  #about h3 { margin: 20px 0 6px; font-size: 14px; color: var(--cyan); letter-spacing: .1em; }
+  #about h3.approx { color: var(--amber); }
+  #about p, #about li { font-size: 14px; line-height: 1.7; color: #d7d3ca; }
+  #about code { font: 12.5px ui-monospace, Menlo, monospace; color: #fff; background: rgba(255, 255, 255, .07); padding: 1px 5px; border-radius: 4px; }
+  #about ul { margin: 0; padding-left: 18px; }
+  #about footer { margin-top: 22px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--dim); }
+  #about button { border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: var(--ink); border-radius: 8px; padding: 6px 16px; cursor: pointer; font: inherit; }
+
+  #fatal { position: fixed; inset: 0; z-index: 50; display: grid; place-content: center; gap: 6px; padding: 24px; text-align: center; background: #05060a; }
+  #fatal[hidden] { display: none; }
+  #fatal p { color: var(--dim); }
+  #fatal #fatalMsg { color: var(--amber); font: 12px ui-monospace, Menlo, monospace; text-align: left; white-space: pre-wrap; max-width: 90vw; max-height: 50vh; overflow: auto; }
+
+  @media (min-width: 1560px) { #wavePanel { bottom: 28px; } }
+  @media (max-width: 1100px) { #wavePanel { display: none; } }
+  @media (max-width: 900px) {
+    #masthead { left: 16px; top: 14px; }
+    #masthead h1 { font-size: 24px; }
+    #data { top: auto; bottom: 92px; left: 12px; right: 12px; width: auto; max-height: 36vh; }
+    .timeline { width: auto; flex: 1; }
+    #dock { bottom: 14px; left: 12px; right: 12px; transform: none; }
+    #hint { display: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="stage"></div>
+<div id="fade"></div>
+
+<header class="ui" id="masthead">
+  <h1>视界终舞</h1>
+  <p>FINAL DANCE OF THE HORIZONS</p>
+  <p class="sub">两个黑洞的旋近、并合与铃宕 —— 逐像素积分的广义相对论光线追踪</p>
+</header>
+
+<div class="ui" id="hint">拖动旋转视角 · 滚轮缩放 · 空格暂停 · 时间轴可拖动 · H 隐藏界面</div>
+<div class="ui" id="bareHint">按 H 显示界面</div>
+
+<aside class="ui panel" id="data">
+  <span class="tag" id="vPhase" data-stage="inspiral">旋近</span>
+  <dl>
+    <dt>物理时间</dt>      <dd id="vTime">—</dd>
+    <dt>回放</dt>          <dd id="vSlow">—</dd>
+    <dt>轨道分离 a</dt>    <dd id="vSep">—</dd>
+    <dt>轨道频率</dt>      <dd id="vForb">—</dd>
+    <dt>引力波频率</dt>    <dd id="vFgw">—</dd>
+    <dt>轨道速度</dt>      <dd id="vSpeed">—</dd>
+    <dt>引力波光度</dt>    <dd id="vLum">—</dd>
+    <dt>相机距离</dt>      <dd id="vDist">—</dd>
+  </dl>
+  <details class="settings">
+    <summary>系统与设置</summary>
+    <dl class="static" id="vStatic"></dl>
+    <label>质量比 <output id="vQOut">1 : 1.0</output><input id="vQ" type="range" min="0" max="100" step="0.5" value="0" aria-label="质量比"></label>
+    <label>总质量
+      <select id="vMass">
+        <option value="20">20 M☉</option><option value="60" selected>60 M☉</option>
+        <option value="150">150 M☉</option><option value="600">600 M☉</option>
+      </select>
+    </label>
+    <label>回放速度 <output id="vRateOut">×1</output><input id="vRate" type="range" min="-2" max="2" step="0.25" value="0" aria-label="回放速度"></label>
+    <label>画质
+      <select id="vQuality">
+        <option value="auto">自动</option><option value="low">流畅</option>
+        <option value="medium">均衡</option><option value="high">精细</option>
+      </select>
+    </label>
+    <label class="check"><span>吸积盘</span><input id="vDisk" type="checkbox" checked></label>
+    <label class="check"><span>自动运镜</span><input id="vAutoCam" type="checkbox" checked></label>
+  </details>
+</aside>
+
+<section class="ui panel" id="wavePanel">
+  <canvas id="wave"></canvas>
+  <div class="caption">引力波应变 h(t) · 四极（l = m = 2）</div>
+</section>
+
+<nav class="ui panel" id="dock">
+  <button class="icon" id="vPlay" aria-label="暂停">❚❚</button>
+  <button class="icon" id="vReset" aria-label="从头播放">↺</button>
+  <div class="timeline">
+    <div id="vTimeline" role="slider" aria-label="时间轴，拖动跳转"><div id="vFill"></div><i id="vMarkTrig"></i><i id="vMarkRing"></i></div>
+    <div class="ticks"><span>旋近</span><span>并合</span><span>铃宕</span></div>
+  </div>
+  <button class="icon" id="vHelp" aria-label="物理说明">?</button>
+  <button class="icon" id="vHide" aria-label="隐藏界面（H）">◐</button>
+</nav>
+
+<dialog class="panel" id="about">
+  <h2>物理说明</h2>
+  <p>画面中的每个像素都是一条在弯曲时空中积分出来的光线；右侧的数字是这条轨道在真实物理下的时间、频率和光度。</p>
+
+  <h3>严格计算的部分</h3>
+  <ul>
+    <li><b>光线。</b>对 Schwarzschild 时空的零测地线逐像素做四阶 Runge–Kutta 积分，方程等价于 Binet 方程 <code>u″ + u = 3Mu²</code>。弱场极限回到偏折角 4GM/c²b，阴影半径为 3√3 GM/c²。项目自带的测试把它与精确的椭圆积分求积逐点核对到 3×10⁻⁴。</li>
+    <li><b>频移与增亮。</b>盘物质发出的光，观测频率与发射频率之比 <code>g = √(1 − 3M/r) ⁄ (1 − Ω·L)</code>，同时包含引力红移、纵向与横向多普勒；观测色温等于发射温度乘以 g。所以盘的一侧更亮更蓝、另一侧更暗更红。</li>
+    <li><b>颜色。</b>对普朗克黑体谱在可见波段做数值积分，经 CIE 标准观察者配色函数得到真实的黑体颜色。</li>
+    <li><b>盘的运动。</b>圆轨道角速度 Ω = √(GM/r³) 与最内稳定圆轨道 ISCO = 6GM/c² 在 Schwarzschild 时空中是严格结果。</li>
+    <li><b>铃宕。</b>新黑洞是一个被激发的黑洞，按 l = m = 2 的准正规模式振荡：Mω = 0.3737 − 0.0890i。画面里视界与光子球在赤道面内的四极形变就按它做。</li>
+    <li><b>轨道。</b>有效单体（EOB）哈密顿量配合 2.5 阶后牛顿能量通量，通量用 Padé 近似重求和。ν→0 时圆轨道精确还原 Schwarzschild 的单粒子轨道。</li>
+  </ul>
+
+  <h3 class="approx">近似的部分</h3>
+  <ul>
+    <li><b>双黑洞的度规没有解析形式。</b>两个黑洞对光线的偏折按各自质量叠加，忽略了相互间的背反应。间距只有几 M 时（最后的并合瞬间）只是定性正确。</li>
+    <li><b>残骸按不旋转的黑洞渲染。</b>实际残骸的自旋约为 0.69（等质量时），视界略小、阴影略呈不对称，这里没有体现。</li>
+    <li><b>最后约 3M 的轨道。</b>后牛顿展开的势在这么近的地方已不可信，那里改用恒定径向速率并入。</li>
+    <li><b>回放时钟是非线性的。</b>恒星质量黑洞从间距 10M 到并合只需不到一秒，铃宕只有几毫秒。“回放”一栏显示画面比真实时间慢了多少倍；物理时间与频率本身都是真实的。</li>
+    <li><b>并合瞬间是慢镜头。</b>两个视界融为一体在物理上只有约 5GM/c³，画面把它放慢到约两秒。</li>
+    <li><b>吸积盘是简化模型。</b>温度按薄盘分布 T ∝ [r⁻³(1 − √(r<sub>in</sub>/r))]^¼，湍流纹理是程序生成的，不是磁流体力学计算；亮度随温度的上升做了压缩（真实黑体总辐射正比于 T⁴）。</li>
+    <li><b>轨道演化是一阶有效单体模型。</b>并合前最后约 25 个 GM/c³ 里引力波光度已达到峰值（等质量约 3.6×10⁴⁹ W，与 GW150914 一致），但真实系统的高光度阶段更长，所以这里给出的辐射总能量约为数值相对论值的七成。</li>
+    <li><b>残骸的质量与自旋</b>取自对数值相对论结果的拟合公式，等质量时精确，质量比悬殊时有百分之几的误差。</li>
+  </ul>
+
+  <footer><span>几何单位 G = c = 1；M 为总质量对应的几何长度 GM/c²</span><button id="vAboutClose">知道了</button></footer>
+</dialog>
+
+<div id="fatal" hidden role="alert">
+  <h2>无法启动</h2>
+  <p id="fatalMsg"></p>
+  <p>本页面需要支持 WebGL 2 的浏览器（Chrome、Edge、Firefox、Safari 的较新版本）。</p>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
