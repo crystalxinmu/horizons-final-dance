@@ -8,6 +8,8 @@
 
 ## 观看
 
+**在线版**：<https://crystalxinmu.github.io/horizons-final-dance/>（GitHub Pages，随仓库自动更新；在中国大陆的访问速度取决于到 GitHub 的链路）
+
 **方式一：不需要安装，也不需要联网。** 双击打开单文件即可，打开后自动循环播放：
 
 - 仓库根目录的 `视界终舞.html`
@@ -133,6 +135,8 @@ git add -A && git commit -m "说明改动" && git push
 ```
 
 GitHub Pages 以 `index.html` 为入口，所以构建会同时产出 `dist/index.html`（与 `dist/视界终舞.html` 内容相同）。`dist/` 不进仓库，由工作流在云端重新构建。
+
+当前线上地址：<https://crystalxinmu.github.io/horizons-final-dance/>。
 
 ## 验证
 
